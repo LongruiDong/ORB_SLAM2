@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(ORB_SLAM2)
-
+add_definitions(-w) #关闭警告
+#https://www.cnblogs.com/xzd1575/p/5555523.html  for amax44  /home/dlr/3rdparty for 2207
+set(OpenCV_DIR "/home/dlr/3rdparty/opencv-3.2.0/build")
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()

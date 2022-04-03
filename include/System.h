@@ -21,7 +21,7 @@
 
 #ifndef SYSTEM_H
 #define SYSTEM_H
-
+#include<unistd.h> //https://github.com/raulmur/ORB_SLAM2/issues/954#issuecomment-728666638
 #include<string>
 #include<thread>
 #include<opencv2/core/core.hpp>
