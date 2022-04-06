@@ -21,4 +21,9 @@ Vocabulary/ORBvoc.txt
 build/
 *~
 lib/
+logs
+result/*/errors
+result/*/plot_*
+result/*/frame/errors
+result/*/frame/plot_*
 

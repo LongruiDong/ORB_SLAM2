@@ -28,6 +28,7 @@
 #include<opencv2/core/core.hpp>
 
 #include<System.h>
+#include <include/Converter.h>//用来进行数据转换
 
 using namespace std;
 
@@ -46,21 +47,28 @@ int main(int argc, char **argv)
     vector<string> vstrImageLeft;
     vector<string> vstrImageRight;
     vector<double> vTimestamps;
+    string pathtoseq=string(argv[3]); // /home/dlr/kitti/dataset/sequences/04
+    string seqid = pathtoseq.substr(pathtoseq.length()-2); // 04
     LoadImages(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps);
 
     const int nImages = vstrImageLeft.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::STEREO,false);
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
     vTimesTrack.resize(nImages);
 
     cout << endl << "-------" << endl;
-    cout << "Start processing sequence ..." << endl;
+    cout << "Start processing sequence kitti "<<seqid<<"..." << endl;
     cout << "Images in the sequence: " << nImages << endl << endl;   
 
+    string ftrack = "result/stereotrack/"   //记录前端的tracking结果 验证是否和输入的初始轨迹一样
+                        + seqid +".txt";
+    ofstream f;
+    f.open(ftrack.c_str());
+    f << fixed;
     // Main loop
     cv::Mat imLeft, imRight;
     for(int ni=0; ni<nImages; ni++)
@@ -84,14 +92,24 @@ int main(int argc, char **argv)
 #endif
 
         // Pass the images to the SLAM system
-        SLAM.TrackStereo(imLeft,imRight,tframe);
+        cv::Mat T_track = SLAM.TrackStereo(imLeft,imRight,tframe);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
 #else
         std::chrono::monotonic_clock::time_point t2 = std::chrono::monotonic_clock::now();
 #endif
-
+        if(T_track.empty())//合法性检查
+        {
+            cerr << endl << "WARNING: Empty track pose at: "
+                 << ni << endl;
+            return 1;
+        }
+        cv::Mat Ttrack = ORB_SLAM2::Converter::InverseMat(T_track.clone());//取逆得到Twc
+        //输出到文件 保存为kitti轨迹格式 小数点后6位小数
+        f << setprecision(9) << Ttrack.at<float>(0, 0) << " " << Ttrack.at<float>(0, 1) << " " << Ttrack.at<float>(0, 2) << " " << Ttrack.at<float>(0, 3) << " " 
+                             << Ttrack.at<float>(1, 0) << " " << Ttrack.at<float>(1, 1) << " " << Ttrack.at<float>(1, 2) << " " << Ttrack.at<float>(1, 3) << " " 
+                             << Ttrack.at<float>(2, 0) << " " << Ttrack.at<float>(2, 1) << " " << Ttrack.at<float>(2, 2) << " " << Ttrack.at<float>(2, 3) << endl;
         double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
         vTimesTrack[ni]=ttrack;
@@ -106,7 +124,7 @@ int main(int argc, char **argv)
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
     }
-
+    f.close();
     // Stop all threads
     SLAM.Shutdown();
 
@@ -122,7 +140,8 @@ int main(int argc, char **argv)
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
     // Save camera trajectory
-    SLAM.SaveTrajectoryKITTI("CameraTrajectory.txt");
+    string savepath = "result/stereo/" + seqid +".txt";
+    SLAM.SaveTrajectoryKITTI(savepath);
 
     return 0;
 }
