@@ -27,3 +27,5 @@ result/*/plot_*
 result/*/frame/errors
 result/*/frame/plot_*
 
+Examples/Stereo/stereo_k360
+Examples/Stereo/stereo_oxford
