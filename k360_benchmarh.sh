@@ -20,6 +20,6 @@ nohup /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/
 
 
 # eval
-# python ~/Project/kitti-odom-eval/eval_odom.py --align 6dof --result result/stereo
-# python ~/Project/kitti-odom-eval/eval_odom.py --align 6dof --result result/stereotrack
+# python ~/Project/kitti-odom-eval/eval_kt360.py --align 6dof --result result/stereo
+# python ~/Project/kitti-odom-eval/eval_kt360.py --align 6dof --result result/stereotrack
 
