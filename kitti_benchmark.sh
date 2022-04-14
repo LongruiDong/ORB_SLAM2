@@ -1,7 +1,7 @@
 #!/bin/bash
 #raw data extract - benchmark /media/kitti
-# pathDatasetKITTI='/home/dlr/kitti/dataset/sequences' #for amax44
-pathDatasetKITTI='/mdata/kitti/dataset/sequences' #for PC
+pathDatasetKITTI='/home/dlr/kitti/dataset/sequences' #for amax44
+# pathDatasetKITTI='/mdata/kitti/dataset/sequences' #for PC
 # 00 01 02 03 08 09 10 的平移需要降低 
 # 00 02 03 04 05 07 08 09 10 的旋转需要降低
 # 00 02 05 06 07 09 contain loops

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(ORB_SLAM2)
 add_definitions(-w) #关闭警告
 #https://www.cnblogs.com/xzd1575/p/5555523.html  for amax44  /home/dlr/3rdparty for 2207
-set(OpenCV_DIR "/home/dlr/3rdparty/opencv-3.2.0/build")
+set(OpenCV_DIR "/home/dlr/mydependency/opencv-3.2.0/build")
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
@@ -94,6 +94,14 @@ add_executable(stereo_kitti
 Examples/Stereo/stereo_kitti.cc)
 target_link_libraries(stereo_kitti ${PROJECT_NAME})
 
+add_executable(stereo_k360
+Examples/Stereo/stereo_k360.cc)
+target_link_libraries(stereo_k360 ${PROJECT_NAME})
+
+add_executable(stereo_oxford
+Examples/Stereo/stereo_oxford.cc)
+target_link_libraries(stereo_oxford ${PROJECT_NAME})
+
 # add_executable(stereo_euroc
 # Examples/Stereo/stereo_euroc.cc)
 # target_link_libraries(stereo_euroc ${PROJECT_NAME})
@@ -105,9 +113,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/Monocular)
 # Examples/Monocular/mono_tum.cc)
 # target_link_libraries(mono_tum ${PROJECT_NAME})
 
-add_executable(mono_kitti
-Examples/Monocular/mono_kitti.cc)
-target_link_libraries(mono_kitti ${PROJECT_NAME})
+# add_executable(mono_kitti
+# Examples/Monocular/mono_kitti.cc)
+# target_link_libraries(mono_kitti ${PROJECT_NAME})
 
 # add_executable(mono_euroc
 # Examples/Monocular/mono_euroc.cc)
