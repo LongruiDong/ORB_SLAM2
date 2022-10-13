@@ -21,7 +21,7 @@
 
 #ifndef SYSTEM_H
 #define SYSTEM_H
-
+#include<unistd.h> //https://github.com/raulmur/ORB_SLAM2/issues/954#issuecomment-728666638
 #include<string>
 #include<thread>
 #include<opencv2/core/core.hpp>
@@ -115,6 +115,9 @@ public:
     // TODO: Save/Load functions
     // SaveMap(const string &filename);
     // LoadMap(const string &filename);
+
+    // 保存地图点到txt
+    void SaveMapPoints(const string &filename);
 
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)

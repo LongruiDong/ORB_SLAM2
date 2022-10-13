@@ -406,7 +406,7 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 
         cv::Mat R = pKF->GetRotation().t();
         vector<float> q = Converter::toQuaternion(R);
-        cv::Mat t = pKF->GetCameraCenter();
+        cv::Mat t = pKF->GetCameraCenter(); // time x y z i j k w 注意格式
         f << setprecision(6) << pKF->mTimeStamp << setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
           << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
 
@@ -487,6 +487,36 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackedKeyPointsUn;
+}
+
+// https://github.com/raulmur/ORB_SLAM2/issues/526#issue-298887338
+// https://github.com/raulmur/ORB_SLAM/issues/5#issuecomment-181451584
+// 保存重建的稀疏点云 先就是简单的 txt 吧
+void System::SaveMapPoints(const string &filename)
+{
+    cout << endl << "Saving map points to " << filename << " ..." << endl;
+    vector<MapPoint*> vpMPs = mpMap->GetAllMapPoints();
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    ofstream f;
+    f.open(filename.c_str());
+    f << fixed;
+
+    for(size_t i=0; i<vpMPs.size(); i++) {
+        MapPoint* pMP = vpMPs[i];
+
+        if(pMP->isBad())
+            continue;
+
+        cv::Mat MPPositions = pMP->GetWorldPos();
+
+        f << setprecision(7) << " " << MPPositions.at<float>(0) << " " << MPPositions.at<float>(1) << " " << MPPositions.at<float>(2) << endl;
+    }
+
+    f.close();
+    cout << endl << "Map Points saved! (txt)" << endl;
+
 }
 
 } //namespace ORB_SLAM
