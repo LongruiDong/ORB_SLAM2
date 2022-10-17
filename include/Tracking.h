@@ -91,6 +91,7 @@ public:
 
     // Input sensor
     int mSensor;
+    int mseqlen; //增加序列总帧数
 
     // Current Frame
     Frame mCurrentFrame;

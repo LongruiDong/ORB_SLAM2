@@ -691,7 +691,14 @@ void LocalMapping::KeyFrameCulling()
         }  
 
         if(nRedundantObservations>0.9*nMPs)
+        {
+            if(int(pKF->mnFrameId)==mpTracker->mseqlen-1)
+            {//最末帧也不删除
+                continue;
+            }
             pKF->SetBadFlag();
+            cout<<"Cull Kf "<<pKF->mnId<<"( "<<pKF->mnFrameId<<" ) !"<<endl;
+        }     
     }
 }
 

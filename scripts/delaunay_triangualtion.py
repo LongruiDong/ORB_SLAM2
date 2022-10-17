@@ -18,6 +18,7 @@ from matplotlib import cm
 from scipy.spatial import Delaunay
 import open3d as o3d
 import pyvista as pv
+from align_scale import load_traj
 
 
 def display_inlier_outlier(cloud, ind, vis=True):
@@ -39,49 +40,121 @@ def display_inlier_outlier(cloud, ind, vis=True):
                                         #   up=[-0.0694, -0.9768, 0.2024])
     return inlier_cloud
 
-def DT_3d(pcdfile):
+
+def get_align_transformation(est_pcd, gt_pcd,  tr_init = None):
+    """
+    Get the transformation matrix to align the reconstructed mesh to the ground truth mesh.
+    """
+    trans_init = np.eye(4)
+    if tr_init is not None:
+        trans_init = tr_init
+    threshold = 0.05
+    # target 点云 计算法线
+    gt_pcd.estimate_normals()
+    reg_p2p = o3d.pipelines.registration.registration_icp(
+        est_pcd, gt_pcd, threshold, trans_init,
+        o3d.pipelines.registration.TransformationEstimationPointToPlane()) # TransformationEstimationPointToPlane
+    transformation = reg_p2p.transformation
+    return transformation
+    
+
+
+def DT_3d(rawpcdfile, alignpcdfile):
     """
     在3d点云上 进行 Delaunay Triangulation
-    pcdfile: 点云txt 文件路径
+    rawpcdfile: 点云txt 文件路径
+    alignpcdfile: 尺度变换后的 点云文件
     """
     
-    print('[DT_3d] load point cloud from {}'.format(pcdfile))
+    print('[DT_3d] load raw point cloud from {}'.format(rawpcdfile))
     
-    pcdarr = np.loadtxt(pcdfile)
+    pcdarr = np.loadtxt(rawpcdfile)
     npt = pcdarr.shape[0]
     print('pcd size: ', pcdarr.shape)
     # 输出 xyz 的区域  目前显然有尺度问题
     # print('[raw pcd] x y z min:\n', pcdarr.min(axis=0))
     # print('[raw pcd] x y z max:\n', pcdarr.max(axis=0))
     
+    print('[DT_3d] load aligned point cloud from {}'.format(alignpcdfile))
+    alignpcdarr = np.loadtxt(alignpcdfile)
+    if npt != alignpcdarr.shape[0]:
+        print('ERROR: wrong shape! exit')
+        return -1
     # copy from point-nerf data/data_utils.py
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(pcdarr[:, :3]) # 相机位置的点云
     # pcd.normals = o3d.utility.Vector3dVector(pcdarr[:, :3] / np.linalg.norm(pcdarr[:, :3], axis=-1, keepdims=True)) # 每个位置点到原点的距离  每个位置单位向量
     # o3d.visualization.draw_geometries([pcd]) #
     mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    size=0.2, origin=[0, 0, 0]) #显示坐标系 1.0 20.0
+    size=1.0, origin=[0, 0, 0]) #显示坐标系 1.0 20.0
     distances = pcd.compute_nearest_neighbor_distance() # np.asarray() (100, ) http://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html#open3d.geometry.PointCloud.compute_nearest_neighbor_distance
     avg_dist = np.mean(distances) # 平均每点到其最近邻的位置 0.425 ship data
     print('avg nn dist: {}'.format(avg_dist))
     radius = 3 * avg_dist # 从点云到mesh
     
+    alignpcd = o3d.geometry.PointCloud()
+    alignpcd.points = o3d.utility.Vector3dVector(alignpcdarr[:, :3]) # 相机位置的点云
+    alignpcd.normals = o3d.utility.Vector3dVector(alignpcdarr[:, :3] / np.linalg.norm(alignpcdarr[:, :3], axis=-1, keepdims=True)) # 每个位置点到原点的距离  每个位置单位向量
+    distances = alignpcd.compute_nearest_neighbor_distance()
+    avg_dist = np.mean(distances) # 平均每点到其最近邻的位置 0.425 ship data
+    print('align avg nn dist: {}'.format(avg_dist))
+    
+    # _ , gtc2ws = load_traj("dataset/Replica/office0/traj.txt")
+    # fristc2w = gtc2ws[0]
+    # print('frist gt c2w: \n', fristc2w)
+    # gtmesh = o3d.io.read_triangle_mesh('dataset/Replica/cull_replica_mesh/office0.ply')
+    # print('raw gt mesh box: \n', gtmesh.get_axis_aligned_bounding_box())
+    # o3d_gt_pc = o3d.geometry.PointCloud(points=gtmesh.vertices)
+    # cl, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.8) # 20 2
+    # pcd1 = display_inlier_outlier(pcd, ind, vis=False)
+    # tr = get_align_transformation(pcd1, o3d_gt_pc, tr_init = fristc2w)
+    # print('align tr: \n', tr)
+    # gtmesh_1 = copy.deepcopy(gtmesh).transform(np.linalg.inv(tr)) # np.linalg.inv(tr)
+    # print('gt mesh1 box: \n', gtmesh_1.get_axis_aligned_bounding_box())
+    # o3d.visualization.draw_geometries([mesh_frame, gtmesh_1, pcd1]) # gtmesh
+    print('raw pcd box: \n', pcd.get_axis_aligned_bounding_box())
+    print('aligned pcd box: \n', alignpcd.get_axis_aligned_bounding_box())
+    # 先按真实bound 过滤一次
+    pred_v = np.asarray(alignpcd.points)
+    pcd_clip = pcd.select_by_index(np.where((pred_v[:, 0] < 4.1) & (pred_v[:, 0] > -2.2) & (pred_v[:, 1] < 3.7) & (pred_v[:, 1] > -2.9) & (pred_v[:, 2] < 3.9) & (pred_v[:, 2] > -2.4))[0])
+    print('pcd_clip box: \n', pcd_clip.get_axis_aligned_bounding_box())
+    alignpcd_clip = alignpcd.select_by_index(np.where((pred_v[:, 0] < 4.1) & (pred_v[:, 0] > -2.2) & (pred_v[:, 1] < 3.7) & (pred_v[:, 1] > -2.9) & (pred_v[:, 2] < 3.9) & (pred_v[:, 2] > -2.4))[0])
+    print('aligned pcd_clip box: \n', alignpcd_clip.get_axis_aligned_bounding_box())
+    
     # 对点云滤波 open3d的函数
     # http://www.open3d.org/docs/release/tutorial/geometry/pointcloud_outlier_removal.html
     print("Statistical oulier removal")
-    cl, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.8) # 20 2
-    inlier_cloud = display_inlier_outlier(pcd, ind, vis=False)
-    distances = inlier_cloud.compute_nearest_neighbor_distance() 
-    avg_dist = np.mean(distances)
-    radius = 3 * avg_dist
+    cl, ind = alignpcd_clip.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.9) # 20 2
+    aligninlier_cloud = display_inlier_outlier(alignpcd_clip, ind, vis=True)
+    print('align inlier pcd box: \n', aligninlier_cloud.get_axis_aligned_bounding_box())
+    inlier_cloud = display_inlier_outlier(pcd_clip, ind, vis=True)
+    print('raw inlier pcd box: \n', inlier_cloud.get_axis_aligned_bounding_box())
+    # 原始坐标系 用于和原yaml参数对比 my2
+    # bound: [[-2.1,2.4],[-3.2,1.9],[-1.2,1.8]] # 
+    # gt depth 投影后的点云 边界
+    # min([-2.00679093, -3.14577566, -1.14950645])
+    # max([2.39498164, 1.79798702, 1.77147197])
+    # distances = inlier_cloud.compute_nearest_neighbor_distance() 
+    # avg_dist = np.mean(distances)
+    # radius = 3 * avg_dist
     pcdarr = np.asarray(inlier_cloud.points)
     inlier_cloud = o3d.geometry.PointCloud()
     inlier_cloud.points = o3d.utility.Vector3dVector(pcdarr[:, :3])
     # inlier_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=20))
-    inlier_cloud.normals = o3d.utility.Vector3dVector(pcdarr[:, :3] / np.linalg.norm(pcdarr[:, :3], axis=-1, keepdims=True))
+    # inlier_cloud.normals = o3d.utility.Vector3dVector(pcdarr[:, :3] / np.linalg.norm(pcdarr[:, :3], axis=-1, keepdims=True))
+    
+    pcdarr = np.asarray(aligninlier_cloud.points)
+    aligninlier_cloud = o3d.geometry.PointCloud()
+    aligninlier_cloud.points = o3d.utility.Vector3dVector(pcdarr[:, :3])
+    # inlier_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=20))
+    aligninlier_cloud.normals = o3d.utility.Vector3dVector(pcdarr[:, :3] / np.linalg.norm(pcdarr[:, :3], axis=-1, keepdims=True))
     
     # 保存次点云
     o3d.io.write_point_cloud('inlierpcd.ply', inlier_cloud)
+    o3d.io.write_point_cloud('align_inlierpcd.ply', aligninlier_cloud)
+    if np.asarray(inlier_cloud.points).shape[0] != np.asarray(aligninlier_cloud.points).shape[0]:
+        print('[ERROR] after process size wrong! exit')
+        return -1
     
     # # https://docs.pyvista.org/api/core/_autosummary/pyvista.DataSetFilters.delaunay_3d.html#pyvista.DataSetFilters.delaunay_3d
     # pmesh = pv.read('inlierpcd.ply')
@@ -97,7 +170,9 @@ def DT_3d(pcdfile):
     # pl.add_mesh(grid, color=True, show_edges=True) # grid edges surf
     # pl.show()
     
-    dec_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(inlier_cloud, 0.08) # 此算法不需要normal 0.03 0.06
+    dec_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(inlier_cloud, 0.09) 
+    
+    align_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(aligninlier_cloud, 0.18) # 此算法不需要normal 0.03 0.06 0.08 0.16 0.18 0.20
     
     # 三角剖分内的元素
     # np.asarray(dec_mesh.triangles) # 每个三角形 顶点组成 id 对应下面 的坐标值
@@ -120,64 +195,28 @@ def DT_3d(pcdfile):
     # dec_mesh.remove_duplicated_vertices()
     # dec_mesh.remove_non_manifold_edges()
 
-    vis_lst = [dec_mesh, inlier_cloud, mesh_frame]
+    vis_lst = [dec_mesh, align_mesh, inlier_cloud, aligninlier_cloud, mesh_frame]
     # vis_lst = [inlier_cloud, mesh_frame]
-    # o3d.visualization.draw_geometries(vis_lst)
+    o3d.visualization.draw_geometries(vis_lst)
     
     o3d.io.write_triangle_mesh('triangle_pcd.ply', dec_mesh)
+    o3d.io.write_triangle_mesh('align_triangle_pcd.ply', align_mesh)
     
-    # # 先画出点云 https://blog.csdn.net/qq_27197395/article/details/79414408
-    # x = [pt[0] for pt in pcdarr]
-    # y = [pt[1] for pt in pcdarr]
-    # z = [pt[2] for pt in pcdarr]
     
-    # fig=plt.figure(dpi=120)
-    # ax1=fig.add_subplot(111,projection='3d')
-    # #标题
-    # plt.title('point cloud')
-    # #利用xyz的值，生成每个点的相应坐标（x,y,z）
-    # ax1.scatter(x,y,z,c='b',marker='.',s=2,linewidth=0,alpha=1,cmap='spectral')
-    # ax1.axis('auto')          
-    # ax1.set_xlabel('X Label')
-    # ax1.set_ylabel('Y Label')
-    # ax1.set_zlabel('Z Label')
-    
-    # tri = Delaunay(pcdarr)
-    
-    # # 画图参考 https://www.scaler.com/topics/matplotlib-triangulation/
-    # # https://www.geeksforgeeks.org/tri-surface-plot-in-python-using-matplotlib/
-    # # https://matplotlib.org/stable/gallery/mplot3d/trisurf3d_2.html
-    # # matplotlib triplot 3d
-    # plt.rcParams["figure.figsize"]=(10,10)
-    # ax = plt.figure().gca(projection='3d')
-
-    # ax.plot_trisurf(
-    # pcdarr[:,0], pcdarr[:,1], pcdarr[:,2],
-    # triangles=tri.simplices#, cmap=cm.viridis
-    # )
-    
-    # plt.show()
-
-
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
     # parser command lines
     parser = argparse.ArgumentParser(description='''
       
     ''') 
-    parser.add_argument('pcdfile', type=str, help='3d 点文件路径',default="office0_orb_mappts.txt") #
+    parser.add_argument('alignpcdfile', type=str, help='3d 点文件路径',default="office0_orbalign_mappts.txt") # office0_orbalign_mappts.txt office0_orb_mappts.txt
+    parser.add_argument('rawpcdfile', type=str, help='3d 点文件路径',default="office0_orb_mappts.txt")
     # parser.add_argument('seq', help='所用序列',default='08')
 
     args = parser.parse_args()
     # 读取参数
-    pcdfile = args.pcdfile
+    rawpcdfile = args.rawpcdfile
+    alignpcdfile = args.alignpcdfile
     # seq = args.seq
     # print("\n report result...\n")
-    DT_3d(pcdfile)
+    DT_3d(rawpcdfile, alignpcdfile)

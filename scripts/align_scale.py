@@ -5,13 +5,14 @@
 
 """
 
-from ast import Not
+from ast import If, Not
 import sys, os, argparse, glob, copy
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import open3d as o3d
 from mathutils import Matrix
+import mathutils
 
 fps = 10 # 生成伪时间 但要根据设置的帧率
 
@@ -81,27 +82,60 @@ def SE3toQT(RT):
     tq = np.concatenate([T, quad], 0) # x y z i j k w
     return tq
 
-def load_traj(gtpath, save=None):
+def TQtoSE3(inputs):
+    """
+    x y z i j k w (tum)转为 SE3 matrix 
+    注意 tum四元数 要先转为 w i j k
+    """
+    t, quad1 = inputs[:3], inputs[3:]
+    quad = [quad1[3], quad1[0], quad1[1], quad1[2]]
+    R = mathutils.Quaternion(quad).to_matrix()
+    SE3 = np.eye(4)
+    SE3[0:3, 0:3] = np.array(R)
+    SE3[0:3,3] = t
+    SE3 = Matrix(SE3)
+    return SE3
+    # return R, t
+    
+
+def load_traj(gtpath, save=None, firstI = False):
+    """
+    firstI: True 表示 要把首帧归一化， 默认false
+    """
     with open(gtpath, "r") as f:
         lines = f.readlines()
     n_img = len(lines)
     gtpose = []
+    c2ws = []
+    inv_pose = None
     for i in range(n_img):
         timestamp = float(i * 1.0/fps) # 根据帧率设置伪时间
         line = lines[i]
         c2w = np.array(list(map(float, line.split()))).reshape(4, 4)
+        #测试首帧归一化
+        if inv_pose is None: # 首帧位姿归I 但是好像只有tum做了归一化处理 why
+            inv_pose = np.linalg.inv(c2w) #T0w
+            c2w = np.eye(4)
+        else:
+            c2w = inv_pose@c2w # T0w Twi = T0i
         # 转为tum
         tq = SE3toQT(c2w)
         ttq = np.concatenate([np.array([timestamp]), tq], 0) #  带上时间戳
         gtpose += [ttq]
+        c2ws += [c2w]
     
     gtposes = np.stack(gtpose, 0) # (N, 8)
+    c2ws = np.stack(c2ws, 0)
     
     if save is not None:
-        np.savetxt(save, gtposes)
-        print('save tum-format gt: {}'.format(save))
+        np.savetxt(save, gtposes, fmt="%.1f %.6f %.6f %.6f %.6f %.6f %.6f %.6f")
+        if firstI:
+            print('first c2w is I, save tum-format gt: {}'.format(save))
+        else:
+            print('save tum-format gt: {}'.format(save))
         
-    return gtposes
+        
+    return gtposes, c2ws
         
 def associate(first_list, second_list, offset=0.0, max_difference=0.02):
     """
@@ -135,6 +169,71 @@ def associate(first_list, second_list, offset=0.0, max_difference=0.02):
     matches.sort()
     return matches       
         
+def findkf(dic_est, query):
+    """
+    query 是 time 
+    得从dic_est 找到前后相邻最近的 时间戳 key
+    """
+    
+    # 分别按 增序 和 降序 对字典进行排序
+    ascend = sorted(dic_est.keys())
+    descend = sorted(dic_est.keys(), reverse=True)
+    
+    for i in range(len(dic_est)):
+        atime = float(ascend[i])
+        if atime > query:
+            start_key = ascend[i-1]
+            end_key = ascend[i]
+            break
+    # for j in range(len(dic_est)):
+    #     dtime = float(descend[j])
+    #     if dtime < query:
+    #         end_key = descend[j-1]
+    #         break
+    
+    return start_key, end_key
+    
+
+def pose_interp(dic_gt, dic_est):
+    """
+    按全部普通帧数 给输出的kf pose 线性插值
+    """
+    new_est = copy.deepcopy(dic_est)
+    lastkf = float(list(dic_est.keys())[-1])
+    for (gtk, gtv) in dic_gt.items():
+        gttime = float(gtk)
+        # if gttime==198.7:
+        #     print('debug end')
+        # 需要找到est里前后的kf 位姿
+        if (not gtk in dic_est.keys()) and (gttime < lastkf): # est 中没有时间戳 才去插值
+            start_key, end_key = findkf(dic_est,gttime)
+            print('[debug] probe: {}, start: {}, end: {}'.format(gttime, float(start_key), float(end_key)))
+            start_tq = dic_est[start_key] # 注意这里都是四元数
+            end_tq = dic_est[end_key]
+            start_pose = TQtoSE3(start_tq)
+            end_pose = TQtoSE3(end_tq)
+            ret_pose= start_pose.inverted() @ end_pose # 整体相对位姿 ret_R, ret_t Tse
+            ret_pose = np.array(ret_pose)
+            ret_R, ret_t = Matrix(ret_pose[0:3, 0:3]), ret_pose[0:3, 3]
+            ret_q = ret_R.to_quaternion()
+            rot_vector, angle = ret_q.to_axis_angle()
+            ratio = (gttime - float(start_key)) / (float(end_key) - float(start_key))
+            delta_t = ratio * ret_t
+            delta_angle = ratio * angle
+            delta_q = mathutils.Quaternion(rot_vector, delta_angle)
+            quad = [delta_q[1], delta_q[2], delta_q[3], delta_q[0]] # wijk->i j k w
+            delta_tq = np.concatenate([delta_t, quad], 0) # x y z i j k w
+            delta_pose = TQtoSE3(delta_tq) # Tsd
+            probe_pose = start_pose @ delta_pose # Twd = Tws * Tsd
+            probe_tq = SE3toQT(np.array(probe_pose))
+            new_est[gtk] = probe_tq
+    
+    return new_est
+        
+        
+        
+                    
+        
 
 def correct_mapscale(pcdfile, predpose, gttraj):
     """
@@ -150,15 +249,34 @@ def correct_mapscale(pcdfile, predpose, gttraj):
     print('load pred pose from {}'.format(predpose))
     print('load gt traj from {}'.format(gttraj))
     
-    gtpose = load_traj(gttraj, save='dataset/Replica/office0/tum_gt.txt')
-    estpose = np.loadtxt(predpose)
+    gtpose, _ = load_traj(gttraj, save='dataset/Replica/office0/tum_gt_firstI.txt', firstI=True)
+    estpose = np.loadtxt(predpose) # 本身是kf pose
+    
     # 转变为 字典 key 为 时间戳
     n_gt = gtpose.shape[0]
     n_est = estpose.shape[0]
     print('gt pose: ', gtpose.shape)
     print('est pose: ', estpose.shape)
-    dic_gt = dict([(gtpose[i, 0], gtpose[i, 1:4]) for i in range(n_gt)])
-    dic_est = dict([(estpose[i, 0], estpose[i, 1:4]) for i in range(n_est)])
+    dic_gt = dict([(gtpose[i, 0], gtpose[i, 1:]) for i in range(n_gt)])
+    dic_est0 = dict([(float(format(estpose[i, 0], '.1f')), estpose[i, 1:]) for i in range(n_est)])
+    # 对原pose 进行线性插值
+    dic_est1 = pose_interp(dic_gt, dic_est0)
+    # 对dic 顺序排序
+    ascend = sorted(dic_est1.keys())
+    dic_est = dict([(ascend[i], dic_est1[ascend[i]]) for i in range(len(dic_est1))])
+    print('[debug] after interp, dic_est: {}'.format(len(dic_est)))
+    # dic 转为array
+    estframe = []
+    for (k, v) in dic_est.items():
+        ktime = float(k) # v 已经是array
+        ttq =  np.concatenate([np.array([ktime]), v], 0) # [ktime, v]# np.concatenate([np.array([ktime]), v], 0) #  带上时间戳
+        estframe += [ttq]
+    estframe = np.stack(estframe, 0) # (1989, 8)
+    # 保存 插值后的完整pose
+    est_interp_file = 'Interp_FrameTrajectory.txt'
+    np.savetxt(est_interp_file, estframe, fmt="%.1f %.6f %.6f %.6f %.6f %.6f %.6f %.6f")
+    print('save interp pose (tum): ', est_interp_file)
+    dic_est = copy.deepcopy(dic_est0)
     matches = associate(dic_gt, dic_est)
     if len(matches) < 2:
         raise ValueError(
@@ -188,6 +306,12 @@ def correct_mapscale(pcdfile, predpose, gttraj):
     
     correct_mapts = pcdarr * scale
     
+    # 别忘了 要对kf pose 也要同样的尺度变换！！
+    align_estpose = copy.deepcopy(estpose)
+    align_estpose[:,1:4] *= scale
+    savealignposeptfile = 'alignKeyFrameTrajectory.txt'
+    np.savetxt(savealignposeptfile, align_estpose, fmt="%.1f %.6f %.6f %.6f %.6f %.6f %.6f %.6f")
+    print('save alighed kf pose (tum): ', savealignposeptfile)
     # 对比前后 点云 的 bound
     # print('[raw pcd] x y z min:\n', pcdarr.min(axis=0))
     # 保存新点云
@@ -205,7 +329,7 @@ def correct_mapscale(pcdfile, predpose, gttraj):
     print('scaled pcd box: \n', saclepcd.get_axis_aligned_bounding_box())
     
     mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    size=0.2, origin=[0, 0, 0]) #显示坐标系 1.0 20.0
+    size=1.2, origin=[0, 0, 0]) #显示坐标系 1.0 20.0
     vis_lst = [rawpcd, saclepcd, mesh_frame]
     o3d.visualization.draw_geometries(vis_lst)
     
