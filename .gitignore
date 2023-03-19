@@ -22,6 +22,8 @@ build/
 *~
 lib/
 logs
+resultk360/
+resultoxford/
 resultk360/*/errors
 resultk360/*/plot_*
 resultk360/*/frame/errors
