@@ -383,7 +383,7 @@ void System::SaveTrajectoryTUM(const string &filename)
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
-
+    //timestamp tx ty tz qx qy qz qw
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
 
