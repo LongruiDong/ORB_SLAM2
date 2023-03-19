@@ -22,10 +22,14 @@ build/
 *~
 lib/
 logs
-result/*/errors
-result/*/plot_*
-result/*/frame/errors
-result/*/frame/plot_*
+resultk360/*/errors
+resultk360/*/plot_*
+resultk360/*/frame/errors
+resultk360/*/frame/plot_*
+resultoxford/*/errors
+resultoxford/*/plot_*
+resultoxford/*/frame/errors
+resultoxford/*/frame/plot_*
 
 Examples/Stereo/stereo_k360
 Examples/Stereo/stereo_oxford

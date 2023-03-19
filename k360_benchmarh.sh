@@ -15,8 +15,10 @@ mkdir result/stereo -p
 
 # echo "Launching KITTI-03 with Stereo-Lidar sensor" # 0 800
 # /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/ORB_SLAM2/Vocabulary/ORBvoc.txt /home/dlr/Project/ORB_SLAM2/Examples/Stereo/KITTI03.yaml "$pathDatasetK360"/03 /home/dlr/Project/ORB_SLAM2/rectified_imu_kitti/03.txt 0 800 0 > logs/03log.txt
-nohup /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/ORB_SLAM2/Vocabulary/ORBvoc.txt /home/dlr/Project/ORB_SLAM2/Examples/Stereo/KITTI360.yaml "$pathDatasetK360"/12 >logs/hzqout12.txt 2>&1 &
-nohup /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/ORB_SLAM2/Vocabulary/ORBvoc.txt /home/dlr/Project/ORB_SLAM2/Examples/Stereo/KITTI360.yaml "$pathDatasetK360"/14 >logs/hzqout14.txt 2>&1 &
+# nohup /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/ORB_SLAM2/Vocabulary/ORBvoc.txt /home/dlr/Project/ORB_SLAM2/Examples/Stereo/KITTI360.yaml "$pathDatasetK360"/12 >logs/hzqout12.txt 2>&1 &
+# nohup /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/ORB_SLAM2/Vocabulary/ORBvoc.txt /home/dlr/Project/ORB_SLAM2/Examples/Stereo/KITTI360.yaml "$pathDatasetK360"/14 >logs/hzqout14.txt 2>&1 &
+
+nohup /home/dlr/Project/ORB_SLAM2/Examples/Stereo/stereo_k360 /home/dlr/Project/ORB_SLAM2/Vocabulary/ORBvoc.txt /home/dlr/Project/ORB_SLAM2/Examples/Stereo/KITTI360.yaml "$pathDatasetK360"/20 >logs/hzqout20.txt 2>&1 &
 
 
 # eval

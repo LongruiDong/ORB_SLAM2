@@ -1,0 +1,1 @@
+Sequence: 	 Trans. err. (%): 	 Rot. err. (deg/100m): 	 ATE (m): 	 RPE (m): 	 RPE (deg): 

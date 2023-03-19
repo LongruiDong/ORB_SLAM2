@@ -72,7 +72,7 @@ int main(int argc, char **argv)
     cout << "Start processing sub sequence oxford "<<seqid<<"... from "<< pathtoseq << endl;
     cout << "Images in the sub sequence: " << nImages << endl << endl;   
 
-    string ftrack = "result/stereotrack/"   //记录前端的tracking结果 验证是否和输入的初始轨迹一样
+    string ftrack = "resultoxford/stereotrack/"   //记录前端的tracking结果 验证是否和输入的初始轨迹一样
                         + seqid +".txt";
     ofstream f;
     f.open(ftrack.c_str());
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
     // Save camera trajectory
-    string savepath = "result/stereo/" + seqid +".txt";
+    string savepath = "resultoxford/stereo/" + seqid +".txt";
     SLAM.SaveTrajectoryKITTI(savepath);
 
     return 0;
