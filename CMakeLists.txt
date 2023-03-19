@@ -113,6 +113,10 @@ add_executable(mono_scannet
 Examples/Monocular/mono_scannet.cc)
 target_link_libraries(mono_scannet ${PROJECT_NAME})
 
+add_executable(mono_lsfb
+Examples/Monocular/mono_lsfb.cc)
+target_link_libraries(mono_lsfb ${PROJECT_NAME})
+
 # add_executable(mono_tum
 # Examples/Monocular/mono_tum.cc)
 # target_link_libraries(mono_tum ${PROJECT_NAME})
