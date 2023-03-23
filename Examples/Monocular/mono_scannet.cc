@@ -63,6 +63,10 @@ int main(int argc, char **argv)
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
     vTimesTrack.resize(nImages);
+    // 存储tracking 的位姿
+    vector<cv::Mat> vTracktraj;
+    vTracktraj.resize(nImages);
+    vTimestamps.resize(nImages);
 
     cout << endl << "-------" << endl;
     cout << "Start processing sequence ..." << endl;
@@ -92,7 +96,9 @@ int main(int argc, char **argv)
 #endif
 
         // Pass the image to the SLAM system
-        SLAM.TrackMonocular(im,tframe);
+        cv::Mat T_track = SLAM.TrackMonocular(im,tframe); // Tcw
+        vTracktraj[ni] = T_track;
+        vTimestamps[ni] = tframe;
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -133,6 +139,9 @@ int main(int argc, char **argv)
     string dataset_name = GetDatasetName(string(argv[3])); 
     auto trajString = "result/mono/scannet_" + dataset_name + "_KeyFrameTrajectory";
     SLAM.SaveKeyFrameTrajectoryTUM(trajString + ".txt");
+    // 增加 保存每帧位姿
+    auto trajString_track = "result/mono/scannet_" + dataset_name + "_FrameTrajectory";
+    SLAM.SaveFrameTrajectory(trajString_track + ".txt", vTracktraj, vTimestamps);
 
     return 0;
 }

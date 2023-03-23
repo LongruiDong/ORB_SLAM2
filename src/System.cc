@@ -379,6 +379,47 @@ void System::SaveTrajectoryTUM(const string &filename)
     cout << endl << "trajectory saved!" << endl;
 }
 
+void System::SaveFrameTrajectory(const string &filename, vector<cv::Mat>& vTracktraj, vector<double>& vTimestamps)
+{
+    cout << endl << "Saving TRACKING trajectory to " << filename << " ..." << endl;
+
+    ofstream f;
+    f.open(filename.c_str());
+    f << fixed;
+
+    int n = vTracktraj.size();
+    
+    if(n != (int)vTimestamps.size())
+    {
+        cerr << "ERROR: SaveFrameTrajectory>> time size != mat size." << endl;
+        return;
+    }
+    cout<<"track size :"<< n << endl;
+    for(int i=0; i<n; ++i)
+    {
+        double tt = vTimestamps[i];
+
+        cv::Mat Tcw = vTracktraj[i];
+        if(!Tcw.empty())
+        {
+            cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+            cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
+            // cv::Mat Twc = Converter::InverseMat(Tcw);
+            vector<float> q = Converter::toQuaternion(Rwc);
+            //timestamp tx ty tz qx qy qz qw
+            f << setprecision(6) << tt << " " <<  setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+        }
+        else
+        {
+            // lost nan
+            f << setprecision(6) << tt << " nan nan nan nan nan nan nan" << endl;
+        }
+
+    }
+
+    f.close();
+    cout << endl << "TRACKING trajectory saved!" << endl;
+}
 
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 {
